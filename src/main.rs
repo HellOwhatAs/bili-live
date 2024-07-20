@@ -3,14 +3,15 @@ mod live;
 mod cli;
 mod tui;
 
+use std::path::Path;
 use chrono::{Datelike, Utc, DateTime};
 use login::LoginData;
 
-async fn login(data_path: &str) -> Result<(LoginData, DateTime<Utc>), Box<dyn std::error::Error>> {
+async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>), Box<dyn std::error::Error>> {
     let now = Utc::now();
     let today = (now.year(), now.month(), now.day());
 
-    let login_data = match login::LoginData::load(data_path) {
+    let login_data = match login::LoginData::load(&data_path) {
         Ok(login_data) => login_data,
         _ => {
             let (refresh_token, url) = loop {
@@ -26,13 +27,13 @@ async fn login(data_path: &str) -> Result<(LoginData, DateTime<Utc>), Box<dyn st
                 last_run: today,
                 area: None
             };
-            login_data.dump(data_path)?;
+            login_data.dump(&data_path)?;
             login_data
         }
     };
 
     if login_data.last_run != today {
-        // refresh cookies
+        // TODO: refresh cookies
         // and write back
     }
 
@@ -47,12 +48,15 @@ async fn valid_area(area: &str) -> Result<bool, Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data_path = "./cookies.json";
-
+    let data_path = {
+        let mut data_path = dirs::home_dir().unwrap();
+        data_path.push("bili-live-cookies.json");
+        data_path
+    };
     let cmds = cli::build_commands();
     match cmds.get_matches().subcommand() {
         Some(("status", _)) => {
-            let (login_data, now) = login(data_path).await?;
+            let (login_data, now) = login(&data_path).await?;
             let uid = login_data.cookies["DedeUserID"].as_str();
             let ((living, start_time), (area_id, area_name, cover_url)) = live::get_live_status(&uid).await?;
             let start_time = DateTime::from_timestamp(start_time as i64, 0).ok_or("live start time out of range")?;
@@ -82,12 +86,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cli::print_pairs(&"status", &pairs);
         },
         Some(("start", arg_match)) => {
-            let (mut login_data, _) = login(data_path).await?;
+            let (mut login_data, _) = login(&data_path).await?;
             let area = arg_match.get_one::<String>("area");
             let area = match (area, login_data.area) {
                 (Some(area), _) if valid_area(area).await? => {
                     login_data.area = Some(area.clone());
-                    login_data.dump(data_path)?;
+                    login_data.dump(&data_path)?;
                     area.clone()
                 },
                 (None, Some(area)) => area,
@@ -95,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let area_list = live::live_area_list().await?;
                     let area = tui::ask_area(&area_list)?.to_string();
                     login_data.area = Some(area.clone());
-                    login_data.dump(data_path)?;
+                    login_data.dump(&data_path)?;
                     area
                 }
             };
@@ -110,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cli::print_pairs(&"start", &pairs);
         },
         Some(("stop", _)) => {
-            let (login_data, _) = login(data_path).await?;
+            let (login_data, _) = login(&data_path).await?;
             let message = live::stop_live(&login_data.cookies).await?;
             let mut pairs = vec![];
             if !message.is_empty() {
@@ -121,12 +125,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(("clean", arg_match)) => {
             let area = *arg_match.get_one::<bool>("area").unwrap();
             if area {
-                let (mut login_data, _) = login(data_path).await?;
+                let (mut login_data, _) = login(&data_path).await?;
                 login_data.area = None;
-                login_data.dump(data_path)?;
+                login_data.dump(&data_path)?;
             }
             else {
-                std::fs::remove_file(data_path)?;
+                std::fs::remove_file(&data_path)?;
             }
         },
         Some((cmd, _)) => panic!("{}", cmd),

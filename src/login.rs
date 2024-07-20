@@ -3,7 +3,7 @@ use qrcode::render::unicode;
 use tokio::time::{sleep, Duration};
 use serde_json::Value;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 pub async fn generate_qr() -> Result<(String, String), Box<dyn std::error::Error>> {
     let mut res: Value = serde_json::from_slice(
@@ -85,14 +85,14 @@ pub struct LoginData {
 }
 
 impl LoginData {
-    pub fn dump(self: &Self, fname: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump<P: AsRef<Path>>(self: &Self, fname: P) -> Result<(), Box<dyn std::error::Error>> {
         let file = std::fs::File::create(fname)?;
         let writer = std::io::BufWriter::new(file);
         serde_json::to_writer(writer, &self)?;
         Ok(())
     }
     
-    pub fn load(fname: &str) -> Result<LoginData, Box<dyn std::error::Error>> {
+    pub fn load<P: AsRef<Path>>(fname: P) -> Result<LoginData, Box<dyn std::error::Error>> {
         let file = std::fs::File::open(fname)?;
         let reader = std::io::BufReader::new(file);
         let result: LoginData = serde_json::from_value(serde_json::from_reader(reader)?)?;
