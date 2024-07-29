@@ -11,7 +11,7 @@ async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>
     let now = Utc::now();
     let today = (now.year(), now.month(), now.day());
 
-    let login_data = match login::LoginData::load(&data_path) {
+    let mut login_data = match login::LoginData::load(&data_path) {
         Ok(login_data) => login_data,
         _ => {
             let (refresh_token, url) = loop {
@@ -33,8 +33,9 @@ async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>
     };
 
     if login_data.last_run != today {
-        // TODO: refresh cookies
-        // and write back
+        login_data.last_run = today;
+        login_data.refresh_cookie().await?;
+        login_data.dump(&data_path)?;
     }
 
     Ok((login_data, now))
