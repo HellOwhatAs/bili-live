@@ -1,9 +1,17 @@
 # bili-live
 
+<p align="left">
+    <a href="https://crates.io/crates/bili-live"><img src="https://img.shields.io/crates/v/bili-live"></a>
+    <a href="https://github.com/HellOwhatAs/bili-live/"><img src="https://img.shields.io/github/languages/top/HellOwhatAs/bili-live"></a>
+</p>
+
 https://www.bilibili.com/video/BV1iHbueDEaw/
 
 ## Install
+### Precompiled Binarys
+Precompiled binarys available at https://github.com/HellOwhatAs/bili-live/releases.
 
+### Install with Cargo
 ```
 cargo install bili-live
 ```
