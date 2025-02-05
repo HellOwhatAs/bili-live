@@ -44,6 +44,10 @@ jobs:
     - name: Build release binary
       shell: bash
       run: |
+        if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+          sudo apt-get update
+          sudo apt-get install libssl-dev
+        fi
         ${{ env.CARGO }} build --release --target=${{ matrix.target }}
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
           cp target/${{ matrix.target }}/release/${{ env.NAME }}.exe target/${{ matrix.target }}/release/${{ env.NAME }}-${{ matrix.target }}.exe
