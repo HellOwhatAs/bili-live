@@ -37,3 +37,6 @@ rand = "0.8.5"
 flate2 = "1.0"
 scraper = "0.19.1"
 cookie = "0.18.1"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
