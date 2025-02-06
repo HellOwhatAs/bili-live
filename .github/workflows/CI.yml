@@ -41,6 +41,14 @@ jobs:
         toolchain: stable
         target: ${{ matrix.target }}
 
+    - name: Setup ARM toolchain
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: |
+        rustup target add aarch64-unknown-linux-gnu
+        curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
+        tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
+        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
+
     - name: Build release binary
       shell: bash
       run: |
