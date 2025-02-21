@@ -1,13 +1,15 @@
-mod login;
-mod live;
 mod cli;
+mod live;
+mod login;
 mod tui;
 
-use std::path::Path;
-use chrono::{Datelike, Utc, DateTime};
+use chrono::{DateTime, Datelike, Utc};
 use login::LoginData;
+use std::path::Path;
 
-async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>), Box<dyn std::error::Error>> {
+async fn login<P: AsRef<Path>>(
+    data_path: P,
+) -> Result<(LoginData, DateTime<Utc>), Box<dyn std::error::Error>> {
     let now = Utc::now();
     let today = (now.year(), now.month(), now.day());
 
@@ -17,7 +19,7 @@ async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>
             let (refresh_token, url) = loop {
                 match login::login().await {
                     Ok(result) => break result,
-                    Err(e) => println!("{:?}", e)
+                    Err(e) => println!("{:?}", e),
                 }
             };
             let binding = reqwest::Url::parse(&url).unwrap();
@@ -25,7 +27,7 @@ async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>
                 cookies: binding.query_pairs().into_owned().collect(),
                 refresh_token,
                 last_run: today,
-                area: None
+                area: None,
             };
             login_data.dump(&data_path)?;
             login_data
@@ -42,9 +44,10 @@ async fn login<P: AsRef<Path>>(data_path: P) -> Result<(LoginData, DateTime<Utc>
 }
 
 async fn valid_area(area: &str) -> Result<bool, Box<dyn std::error::Error>> {
-    Ok(live::live_area_list().await?.into_iter()
-        .any(|(_, li)| 
-            li.into_iter().any(|(_, id)| &id == area)))
+    Ok(live::live_area_list()
+        .await?
+        .into_iter()
+        .any(|(_, li)| li.into_iter().any(|(_, id)| &id == area)))
 }
 
 #[tokio::main]
@@ -59,33 +62,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(("status", _)) => {
             let (login_data, now) = login(&data_path).await?;
             let uid = login_data.cookies["DedeUserID"].as_str();
-            let ((living, start_time), (area_id, area_name, cover_url)) = live::get_live_status(&uid).await?;
-            let start_time = DateTime::from_timestamp(start_time as i64, 0).ok_or("live start time out of range")?;
+            let ((living, start_time), (area_id, area_name, cover_url)) =
+                live::get_live_status(&uid).await?;
+            let start_time = DateTime::from_timestamp(start_time as i64, 0)
+                .ok_or("live start time out of range")?;
             let mut pairs = vec![("is living".to_string(), living.to_string())];
             if living {
                 pairs.push(("start time".to_string(), start_time.to_string()));
-                pairs.push((
-                    "live duration".to_string(),
-                    {
-                        let mut delta = (
-                            now - start_time
-                        ).num_seconds();
-                        let sec = delta % 60;
-                        delta /= 60;
-                        let min = delta % 60;
-                        delta /= 60;
-                        let hour = delta;
-                        format!("{}:{}:{}", hour, min, sec)
-                    }
-                ));
-                pairs.push((
-                    "area".to_string(),
-                    format!("{}[{}]", area_name, area_id)
-                ))
+                pairs.push(("live duration".to_string(), {
+                    let mut delta = (now - start_time).num_seconds();
+                    let sec = delta % 60;
+                    delta /= 60;
+                    let min = delta % 60;
+                    delta /= 60;
+                    let hour = delta;
+                    format!("{}:{}:{}", hour, min, sec)
+                }));
+                pairs.push(("area".to_string(), format!("{}[{}]", area_name, area_id)))
             }
             cli::print_image(&cover_url).await?;
             cli::print_pairs(&"status", &pairs);
-        },
+        }
         Some(("start", arg_match)) => {
             let (mut login_data, _) = login(&data_path).await?;
             let area = arg_match.get_one::<String>("area");
@@ -94,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     login_data.area = Some(area.clone());
                     login_data.dump(&data_path)?;
                     area.clone()
-                },
+                }
                 (None, Some(area)) => area,
                 _ => {
                     let area_list = live::live_area_list().await?;
@@ -105,15 +102,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
             let ((addr, code), message) = live::start_live(&login_data.cookies, &area).await?;
-            let mut pairs = vec![
-                ("addr".to_string(), addr),
-                ("code".to_string(), code),
-            ];
+            let mut pairs = vec![("addr".to_string(), addr), ("code".to_string(), code)];
             if !message.is_empty() {
                 pairs.push(("message".to_string(), message));
             }
             cli::print_pairs(&"start", &pairs);
-        },
+        }
         Some(("stop", _)) => {
             let (login_data, _) = login(&data_path).await?;
             let message = live::stop_live(&login_data.cookies).await?;
@@ -122,18 +116,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 pairs.push(("message".to_string(), message));
             }
             cli::print_pairs(&"stop", &pairs);
-        },
+        }
         Some(("clean", arg_match)) => {
             let area = *arg_match.get_one::<bool>("area").unwrap();
             if area {
                 let (mut login_data, _) = login(&data_path).await?;
                 login_data.area = None;
                 login_data.dump(&data_path)?;
-            }
-            else {
+            } else {
                 std::fs::remove_file(&data_path)?;
             }
-        },
+        }
         Some((cmd, _)) => panic!("{}", cmd),
         None => cli::build_commands().print_help()?,
     }

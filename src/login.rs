@@ -1,26 +1,29 @@
+use base64::{URL_SAFE_NO_PAD, decode_config};
 use qrcode::QrCode;
 use qrcode::render::unicode;
-use tokio::time::{sleep, Duration};
-use serde_json::Value;
-use serde::{Deserialize, Serialize};
-use rsa::{PublicKey, RsaPublicKey, PaddingScheme};
-use sha2::Sha256;
-use base64::{decode_config, URL_SAFE_NO_PAD};
+use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sha2::Sha256;
 use std::{collections::HashMap, io::Read, path::Path};
+use tokio::time::{Duration, sleep};
 
 pub async fn generate_qr() -> Result<(String, String), Box<dyn std::error::Error>> {
     let mut res: Value = serde_json::from_slice(
         reqwest::get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
-        .await?.bytes().await?.as_ref()
+            .await?
+            .bytes()
+            .await?
+            .as_ref(),
     )?;
     let url = match res["data"]["url"].take() {
         Value::String(url) => url,
-        _ => panic!("{:?}", res)
+        _ => panic!("{:?}", res),
     };
     let token = match res["data"]["qrcode_key"].take() {
         Value::String(url) => url,
-        _ => panic!("{:?}", res)
+        _ => panic!("{:?}", res),
     };
     let qr = QrCode::new(url)?.render::<unicode::Dense1x2>().build();
     Ok((qr, token))
@@ -36,12 +39,18 @@ pub enum LoginStatus {
 
 pub async fn check_login_status(token: &str) -> Result<LoginStatus, Box<dyn std::error::Error>> {
     let mut res: Value = serde_json::from_slice(
-        reqwest::get(format!("https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key={}", token))
-        .await?.bytes().await?.as_ref()
+        reqwest::get(format!(
+            "https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key={}",
+            token
+        ))
+        .await?
+        .bytes()
+        .await?
+        .as_ref(),
     )?;
     let status: u64 = match res["data"]["code"].take() {
         Value::Number(num) => num.as_u64().unwrap(),
-        _ => panic!("{:?}", res)
+        _ => panic!("{:?}", res),
     };
 
     match status {
@@ -51,15 +60,15 @@ pub async fn check_login_status(token: &str) -> Result<LoginStatus, Box<dyn std:
             return Ok(LoginStatus::Success((
                 match res["data"]["refresh_token"].take() {
                     Value::String(refresh_token) => refresh_token,
-                    _ => panic!("{:?}", res)
+                    _ => panic!("{:?}", res),
                 },
                 match res["data"]["url"].take() {
                     Value::String(url) => url,
-                    _ => panic!("{:?}", res)
-                }
+                    _ => panic!("{:?}", res),
+                },
             )));
         }
-        _ => Ok(LoginStatus::OutofDate)
+        _ => Ok(LoginStatus::OutofDate),
     }
 }
 
@@ -70,7 +79,7 @@ pub async fn login() -> Result<(String, String), Box<dyn std::error::Error>> {
     let mut sleep_sec = 500;
     loop {
         match check_login_status(&token).await? {
-            LoginStatus::NotScanned => {},
+            LoginStatus::NotScanned => {}
             LoginStatus::Scanned => println!("QR Code Scanned"),
             LoginStatus::Success(res) => return Ok(res),
             LoginStatus::OutofDate => return Err("QR Code Out of Date".into()),
@@ -85,7 +94,7 @@ pub struct LoginData {
     pub cookies: HashMap<String, String>,
     pub refresh_token: String,
     pub last_run: (i32, u32, u32),
-    pub area: Option<String>
+    pub area: Option<String>,
 }
 
 impl LoginData {
@@ -95,7 +104,7 @@ impl LoginData {
         serde_json::to_writer(writer, &self)?;
         Ok(())
     }
-    
+
     pub fn load<P: AsRef<Path>>(fname: P) -> Result<LoginData, Box<dyn std::error::Error>> {
         let file = std::fs::File::open(fname)?;
         let reader = std::io::BufReader::new(file);
@@ -119,20 +128,38 @@ impl LoginData {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            (self.cookies.iter().map(|(k, v)| format!("{k}={v};")).collect::<Vec<_>>().join(" ")).parse().unwrap(),
+            (self
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{k}={v};"))
+                .collect::<Vec<_>>()
+                .join(" "))
+            .parse()
+            .unwrap(),
         );
         let csrf = self.cookies["bili_jct"].as_str();
         let res: Value = serde_json::from_slice(
-            client.get(format!("https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf={}", csrf))
-            .headers(headers).send()
-            .await?.bytes().await?.as_ref()
+            client
+                .get(format!(
+                    "https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf={}",
+                    csrf
+                ))
+                .headers(headers)
+                .send()
+                .await?
+                .bytes()
+                .await?
+                .as_ref(),
         )?;
-        let refresh = res["data"]["refresh"].as_bool().ok_or("refresh is not a Boolean")?;
+        let refresh = res["data"]["refresh"]
+            .as_bool()
+            .ok_or("refresh is not a Boolean")?;
         if refresh {
-            let timestamp = res["data"]["timestamp"].as_u64().ok_or("timestamp is not a Number")? as usize;
+            let timestamp = res["data"]["timestamp"]
+                .as_u64()
+                .ok_or("timestamp is not a Number")? as usize;
             Ok(Some(timestamp))
-        }
-        else {
+        } else {
             Ok(None)
         }
     }
@@ -162,25 +189,48 @@ impl LoginData {
         let encrypted_data = public_key.encrypt(&mut rng, padding, data_bytes)?;
 
         // 将加密结果转换为十六进制字符串
-        let encrypted_hex = encrypted_data.iter().map(|byte| format!("{:02x}", byte)).collect::<String>();
+        let encrypted_hex = encrypted_data
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect::<String>();
 
         Ok(encrypted_hex)
     }
 
-    async fn get_refresh_csrf(&self, timestamp: usize) -> Result<String, Box<dyn std::error::Error>> {
+    async fn get_refresh_csrf(
+        &self,
+        timestamp: usize,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let correspond_path = Self::get_correspond_path(timestamp as u128)?;
 
         let client = reqwest::Client::new();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            (self.cookies.iter().map(|(k, v)| format!("{k}={v};")).collect::<Vec<_>>().join(" ")).parse().unwrap(),
+            (self
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{k}={v};"))
+                .collect::<Vec<_>>()
+                .join(" "))
+            .parse()
+            .unwrap(),
         );
-        headers.insert(reqwest::header::CONTENT_TYPE, "charset=GBK;".parse().unwrap());
-        
-        let bytes = client.get(format!("https://www.bilibili.com/correspond/1/{}", correspond_path))
-            .headers(headers).send()
-            .await?.bytes().await?;
+        headers.insert(
+            reqwest::header::CONTENT_TYPE,
+            "charset=GBK;".parse().unwrap(),
+        );
+
+        let bytes = client
+            .get(format!(
+                "https://www.bilibili.com/correspond/1/{}",
+                correspond_path
+            ))
+            .headers(headers)
+            .send()
+            .await?
+            .bytes()
+            .await?;
 
         let mut decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(bytes));
         let mut decompressed_data = Vec::new();
@@ -190,12 +240,19 @@ impl LoginData {
         let html = Html::parse_document(&res);
         let selector = Selector::parse(r"#\31-name")?; // css escape 1 -> \31
         let refresh_csrf = html
-            .select(&selector).next().ok_or("cannot find #1-name")?
-            .text().next().ok_or("#1-name does not contain inner text")?;
+            .select(&selector)
+            .next()
+            .ok_or("cannot find #1-name")?
+            .text()
+            .next()
+            .ok_or("#1-name does not contain inner text")?;
         Ok(refresh_csrf.to_owned())
     }
 
-    async fn post_cookie_refresh(&mut self, timestamp: usize) -> Result<String, Box<dyn std::error::Error>> {
+    async fn post_cookie_refresh(
+        &mut self,
+        timestamp: usize,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
 
         let mut data = HashMap::new();
@@ -207,31 +264,44 @@ impl LoginData {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            (self.cookies.iter().map(|(k, v)| format!("{k}={v};")).collect::<Vec<_>>().join(" ")).parse().unwrap(),
+            (self
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{k}={v};"))
+                .collect::<Vec<_>>()
+                .join(" "))
+            .parse()
+            .unwrap(),
         );
 
-        let resp = client.post("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
+        let resp = client
+            .post("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
             .headers(headers)
             .form(&data)
-            .send().await?;
+            .send()
+            .await?;
 
         for cookie in resp.headers().get_all(reqwest::header::SET_COOKIE) {
             let parsed_cookie = cookie::Cookie::parse(cookie.to_str()?)?;
-            self.cookies.insert(parsed_cookie.name().to_owned(), parsed_cookie.value().to_owned());
+            self.cookies.insert(
+                parsed_cookie.name().to_owned(),
+                parsed_cookie.value().to_owned(),
+            );
         }
 
-        let mut res: Value = serde_json::from_slice(
-            resp.bytes().await?.as_ref()
-        )?;
+        let mut res: Value = serde_json::from_slice(resp.bytes().await?.as_ref())?;
         let mut old_refresh_token = match res["data"]["refresh_token"].take() {
             Value::String(s) => s,
-            _ => panic!("{:?}", res)
+            _ => panic!("{:?}", res),
         };
         std::mem::swap(&mut self.refresh_token, &mut old_refresh_token);
         Ok(old_refresh_token)
     }
 
-    async fn confirm_refresh(&self, refresh_token_old: String) -> Result<Value, Box<dyn std::error::Error>> {
+    async fn confirm_refresh(
+        &self,
+        refresh_token_old: String,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
 
         let mut data = HashMap::new();
@@ -241,14 +311,26 @@ impl LoginData {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            (self.cookies.iter().map(|(k, v)| format!("{k}={v};")).collect::<Vec<_>>().join(" ")).parse().unwrap(),
+            (self
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{k}={v};"))
+                .collect::<Vec<_>>()
+                .join(" "))
+            .parse()
+            .unwrap(),
         );
 
         let res: Value = serde_json::from_slice(
-            client.post("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
-            .headers(headers)
-            .form(&data)
-            .send().await?.bytes().await?.as_ref()
+            client
+                .post("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
+                .headers(headers)
+                .form(&data)
+                .send()
+                .await?
+                .bytes()
+                .await?
+                .as_ref(),
         )?;
 
         Ok(res)

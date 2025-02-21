@@ -1,16 +1,16 @@
-use std::io::stdout;
 use color_eyre::config::HookBuilder;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     crossterm::{
-        event::{self, Event, KeyCode, KeyEventKind},
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
         ExecutableCommand,
+        event::{self, Event, KeyCode, KeyEventKind},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
     layout::{Constraint, Direction, Layout},
     terminal::Terminal,
     widgets::{Block, List, ListState},
 };
+use std::io::stdout;
 
 fn init_error_hooks() -> color_eyre::Result<()> {
     let (panic, error) = HookBuilder::default().into_hooks();
@@ -47,47 +47,58 @@ fn list_vertical(keycode: KeyCode, list_state: &mut ListState, max_len: usize) {
             let tmp = list_state.selected_mut().as_mut().unwrap();
             if *tmp < max_len - 1 {
                 *tmp += 1;
-            }
-            else {
+            } else {
                 *tmp = 0;
             }
-        },
+        }
         KeyCode::Up => {
             let tmp = list_state.selected_mut().as_mut().unwrap();
             if *tmp > 0 {
                 *tmp -= 1;
-            }
-            else {
+            } else {
                 *tmp = max_len - 1;
             }
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     }
 }
 
-pub fn ask_area(area_list: &Vec<(String, Vec<(String, String)>)>) -> Result<&str, Box<dyn std::error::Error>> {
+pub fn ask_area(
+    area_list: &Vec<(String, Vec<(String, String)>)>,
+) -> Result<&str, Box<dyn std::error::Error>> {
     init_error_hooks()?;
     let mut terminal = init_terminal()?;
     let title = "Live Area";
     let length = area_list.len();
     let lengths = area_list.iter().map(|(_, li)| li.len()).collect::<Vec<_>>();
-    let area_items = area_list.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
-    let left_length = area_items.iter().map(String::len).max().unwrap().max(title.len());
+    let area_items = area_list
+        .iter()
+        .map(|(name, _)| name.clone())
+        .collect::<Vec<_>>();
+    let left_length = area_items
+        .iter()
+        .map(String::len)
+        .max()
+        .unwrap()
+        .max(title.len());
     println!("{}", left_length);
-    let list = List::new(
-        area_items
-    )
+    let list = List::new(area_items)
         .block(Block::bordered().title(title))
-        .highlight_style(ratatui::style::Style::new().add_modifier(ratatui::style::Modifier::REVERSED))
-        .highlight_symbol("> ");
-    let lists = area_list.iter().map(|(title, li)| {
-        List::new(
-            li.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>()
+        .highlight_style(
+            ratatui::style::Style::new().add_modifier(ratatui::style::Modifier::REVERSED),
         )
-            .block(Block::bordered().title(title.as_str()))
-            .highlight_style(ratatui::style::Style::new().add_modifier(ratatui::style::Modifier::REVERSED))
-            .highlight_symbol(">> ")
-    }).collect::<Vec<_>>();
+        .highlight_symbol("> ");
+    let lists = area_list
+        .iter()
+        .map(|(title, li)| {
+            List::new(li.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>())
+                .block(Block::bordered().title(title.as_str()))
+                .highlight_style(
+                    ratatui::style::Style::new().add_modifier(ratatui::style::Modifier::REVERSED),
+                )
+                .highlight_symbol(">> ")
+        })
+        .collect::<Vec<_>>();
 
     let mut list_state = ListState::default();
     list_state.select(Some(0));
@@ -99,25 +110,30 @@ pub fn ask_area(area_list: &Vec<(String, Vec<(String, String)>)>) -> Result<&str
             if key.kind == KeyEventKind::Press {
                 let cur_idx = list_state.selected().unwrap();
                 match key.code {
-                    KeyCode::Left => if !is_left {
-                        is_left = !is_left;
-                        list_states[cur_idx].select(None);
-                    },
-                    KeyCode::Right => if is_left {
-                        is_left = !is_left;
-                        list_states[cur_idx].select(Some(0));
-                    },
+                    KeyCode::Left => {
+                        if !is_left {
+                            is_left = !is_left;
+                            list_states[cur_idx].select(None);
+                        }
+                    }
+                    KeyCode::Right => {
+                        if is_left {
+                            is_left = !is_left;
+                            list_states[cur_idx].select(Some(0));
+                        }
+                    }
                     KeyCode::Up | KeyCode::Down => {
                         if is_left {
                             list_vertical(key.code, &mut list_state, length);
-                        }
-                        else {
+                        } else {
                             list_vertical(key.code, &mut list_states[cur_idx], lengths[cur_idx]);
                         }
-                    },
-                    KeyCode::Enter => if !is_left {
-                        let cur_idx_r = list_states[cur_idx].selected().unwrap();
-                        break &area_list[cur_idx].1[cur_idx_r].1
+                    }
+                    KeyCode::Enter => {
+                        if !is_left {
+                            let cur_idx_r = list_states[cur_idx].selected().unwrap();
+                            break &area_list[cur_idx].1[cur_idx_r].1;
+                        }
                     }
                     _ => {}
                 }
