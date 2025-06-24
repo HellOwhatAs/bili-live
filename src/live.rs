@@ -107,7 +107,7 @@ async fn post_live(
 
     let mut data = HashMap::new();
     data.insert("room_id", room_id.as_str());
-    data.insert("platform", "web_link");
+    data.insert("platform", "pc_link");
     data.insert("csrf_token", &csrf);
     data.insert("csrf", &csrf);
     data.insert("visit_id", "");
