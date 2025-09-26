@@ -108,11 +108,12 @@ async fn post_live(
     let mut data = HashMap::new();
     data.insert("room_id", room_id.as_str());
     data.insert("platform", "pc_link");
-    data.insert("csrf_token", &csrf);
     data.insert("csrf", &csrf);
-    data.insert("visit_id", "");
     if let Some(area) = area {
+        data.insert("csrf_token", &csrf);
         data.insert("area_v2", area);
+        data.insert("version", "1.0.0");
+        data.insert("build", "1234");
     }
 
     let mut headers = reqwest::header::HeaderMap::new();
