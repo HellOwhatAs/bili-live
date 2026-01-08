@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Result};
-use reqwest::{header, Client};
+use anyhow::{Result, anyhow};
+use reqwest::{Client, header};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -212,7 +212,10 @@ impl BiliApi {
         let query = form_urlencoded::Serializer::new(String::new())
             .extend_pairs(&v_data)
             .finish();
-        let v_url = format!("https://api.live.bilibili.com/xlive/app-blink/v1/liveVersionInfo/getHomePageLiveVersion?{}", query);
+        let v_url = format!(
+            "https://api.live.bilibili.com/xlive/app-blink/v1/liveVersionInfo/getHomePageLiveVersion?{}",
+            query
+        );
 
         let v_resp = self
             .client

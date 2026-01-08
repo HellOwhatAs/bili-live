@@ -278,6 +278,9 @@ impl BiliLiveTui {
     fn handle_navigation_input(&mut self, key: KeyCode) {
         match key {
             KeyCode::Char('q') => self.should_quit = true,
+            KeyCode::Char('1') => self.selected_tab = Tab::Setup,
+            KeyCode::Char('2') => self.selected_tab = Tab::Live,
+            KeyCode::Char('3') => self.selected_tab = Tab::Result,
             KeyCode::Tab => {
                 self.selected_tab = match self.selected_tab {
                     Tab::Setup => Tab::Live,

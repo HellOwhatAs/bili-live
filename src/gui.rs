@@ -104,14 +104,15 @@ impl eframe::App for BiliLiveApp {
         for effect in effects {
             match effect {
                 UiEffect::ShowQrReceived(url, _key) => {
-                     let image = Self::create_qr_image(&url);
-                     self.qr_image = Some(ctx.load_texture("qr_code", image, Default::default()));
-                     self.show_qr_window = true;
-                     self.qr_window_title = "请扫码登录".to_string();
+                    let image = Self::create_qr_image(&url);
+                    self.qr_image = Some(ctx.load_texture("qr_code", image, Default::default()));
+                    self.show_qr_window = true;
+                    self.qr_window_title = "请扫码登录".to_string();
                 }
                 UiEffect::FaceAuthQrReceived(content) => {
                     let image = Self::create_qr_image(&content);
-                    self.qr_image = Some(ctx.load_texture("face_auth_qr", image, Default::default()));
+                    self.qr_image =
+                        Some(ctx.load_texture("face_auth_qr", image, Default::default()));
                     self.show_qr_window = true;
                     self.qr_window_title = "需要人脸认证".to_string();
                 }
@@ -123,7 +124,7 @@ impl eframe::App for BiliLiveApp {
                 }
             }
         }
-        
+
         self.draw_top_panel(ctx);
         self.draw_status_panel(ctx);
 
@@ -263,7 +264,7 @@ impl BiliLiveApp {
 
         ui.label(format!("当前分区ID: {}", self.core.live_settings.area_id));
         if self.core.live_settings.area_id.is_empty() {
-            self.core.live_settings.area_id = "374".to_string(); 
+            self.core.live_settings.area_id = "374".to_string();
         }
 
         ui.add_space(10.0);

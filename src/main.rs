@@ -15,8 +15,6 @@ mod types;
 use eframe::egui;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
-
     #[cfg(feature = "gui")]
     {
         let options = eframe::NativeOptions {

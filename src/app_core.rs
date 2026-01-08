@@ -72,7 +72,7 @@ pub struct BiliLiveContext {
     pub live_settings: LiveSettings,
     pub partitions: Vec<ParentPartition>,
     pub live_state: LiveState,
-    
+
     // UI-agnostic logs
     pub log_messages: String,
     pub status_msg: String,
@@ -82,7 +82,7 @@ impl BiliLiveContext {
     pub fn new(repaint_signal: Option<Arc<dyn RepaintSignal>>) -> Self {
         let (tx, rx) = mpsc::channel(100);
         let rt = Runtime::new().expect("Failed to create Tokio runtime");
-        
+
         let signal = repaint_signal.unwrap_or_else(|| Arc::new(NoOpRepaintSignal));
 
         let mut ctx = Self {
@@ -187,8 +187,10 @@ impl BiliLiveContext {
                     }
                 }
                 AppMessage::ParseLoginUrlResult(success, msg, cookies) => {
-                     // Reuse qrcode poll result logic
-                     self.tx.try_send(AppMessage::QrCodePollResult(success, msg, cookies)).ok();
+                    // Reuse qrcode poll result logic
+                    self.tx
+                        .try_send(AppMessage::QrCodePollResult(success, msg, cookies))
+                        .ok();
                 }
             }
         }
@@ -228,14 +230,20 @@ impl BiliLiveContext {
                     // Logic moved from main.rs receive handler to here (or somewhere).
                     // Wait, api returns serde_json::Value. Parsing should happen here on background thread?
                     // Better to parse here to offload UI thread.
-                     if let Some(d) = data.get("data") {
-                        if let Ok(parsed) = serde_json::from_value::<Vec<ParentPartition>>(d.clone()) {
+                    if let Some(d) = data.get("data") {
+                        if let Ok(parsed) =
+                            serde_json::from_value::<Vec<ParentPartition>>(d.clone())
+                        {
                             let _ = tx.send(AppMessage::PartitionLoaded(parsed)).await;
                         } else {
-                            let _ = tx.send(AppMessage::Log("分区数据解析失败".to_string())).await;
+                            let _ = tx
+                                .send(AppMessage::Log("分区数据解析失败".to_string()))
+                                .await;
                         }
                     } else {
-                        let _ = tx.send(AppMessage::Log("分区响应格式错误".to_string())).await;
+                        let _ = tx
+                            .send(AppMessage::Log("分区响应格式错误".to_string()))
+                            .await;
                     }
                 }
                 Err(_) => {
@@ -247,7 +255,7 @@ impl BiliLiveContext {
     }
 
     pub fn fetch_qrcode(&self) {
-         let tx = self.tx.clone();
+        let tx = self.tx.clone();
         let api = self.api.clone();
         let signal = self.repaint_signal.clone();
 
@@ -293,19 +301,19 @@ impl BiliLiveContext {
                                     .await;
                                 break;
                             }
-                            _ => {} 
+                            _ => {}
                         }
                     }
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                // Don't need to repaint every second if nothing changed? 
-                // But user might want to see "polling..." status? 
+                // Don't need to repaint every second if nothing changed?
+                // But user might want to see "polling..." status?
                 // Currently status doesn't change during polling.
             }
             signal.request_repaint();
         });
     }
-    
+
     async fn parse_login_url(url: &str) -> AppMessage {
         if let Ok(parsed) = Url::parse(url) {
             let params: std::collections::HashMap<_, _> =
@@ -338,11 +346,11 @@ impl BiliLiveContext {
             self.log("请先登录".to_string());
             return;
         }
-         if let Some(c) = &self.cookies {
+        if let Some(c) = &self.cookies {
             let api = self.api.clone();
             let tx = self.tx.clone();
             let signal = self.repaint_signal.clone();
-            
+
             let room_id = c.room_id.clone();
             let csrf = c.csrf.clone();
             let area_id = self.live_settings.area_id.clone();
@@ -360,9 +368,9 @@ impl BiliLiveContext {
                 signal.request_repaint();
 
                 let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as i64;
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
                 let ts = now + offset;
 
                 match api
@@ -395,7 +403,7 @@ impl BiliLiveContext {
             });
         }
     }
-    
+
     pub fn stop_live(&self) {
         if let Some(c) = &self.cookies {
             let api = self.api.clone();
@@ -409,7 +417,7 @@ impl BiliLiveContext {
                     .send(AppMessage::Log("正在停止直播...".to_string()))
                     .await;
                 signal.request_repaint();
-                
+
                 if let Err(e) = api.stop_live(&room_id, &csrf).await {
                     let _ = tx
                         .send(AppMessage::StopLiveResult(false, e.to_string()))
@@ -423,9 +431,9 @@ impl BiliLiveContext {
             });
         }
     }
-    
+
     pub fn update_title(&self) {
-         if let Some(c) = &self.cookies {
+        if let Some(c) = &self.cookies {
             let api = self.api.clone();
             let tx = self.tx.clone();
             let signal = self.repaint_signal.clone();
@@ -458,7 +466,7 @@ impl BiliLiveContext {
             });
         }
     }
-    
+
     pub fn send_bullet(&self, msg: String) {
         if let Some(c) = &self.cookies {
             let api = self.api.clone();
@@ -480,7 +488,7 @@ impl BiliLiveContext {
             });
         }
     }
-    
+
     pub fn fetch_server_time(&self) {
         let tx = self.tx.clone();
         let api = self.api.clone();
