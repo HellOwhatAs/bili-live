@@ -45,7 +45,6 @@ impl BiliLiveApp {
             selected_parent_idx: None,
         };
 
-        Self::configure_fonts(&cc.egui_ctx);
         Self::configure_styles(&cc.egui_ctx);
 
         app
@@ -56,29 +55,6 @@ impl BiliLiveApp {
         let image = code.render::<image::Rgba<u8>>().build();
         let size = [image.width() as _, image.height() as _];
         egui::ColorImage::from_rgba_unmultiplied(size, image.into_flat_samples().as_slice())
-    }
-
-    fn configure_fonts(ctx: &egui::Context) {
-        let mut fonts = egui::FontDefinitions::default();
-        let font_data = [
-            "C:\\Windows\\Fonts\\msyh.ttc",
-            "C:\\Windows\\Fonts\\simhei.ttf",
-        ]
-        .iter()
-        .find_map(|p| std::fs::read(p).ok());
-
-        if let Some(data) = font_data {
-            fonts
-                .font_data
-                .insert("system_font".to_owned(), egui::FontData::from_owned(data));
-            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
-                family.insert(0, "system_font".to_owned());
-            }
-            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
-                family.push("system_font".to_owned());
-            }
-            ctx.set_fonts(fonts);
-        }
     }
 
     fn configure_styles(ctx: &egui::Context) {
@@ -228,7 +204,7 @@ impl BiliLiveApp {
         }
 
         ui.horizontal(|ui| {
-            egui::ComboBox::from_id_salt("parent_combo")
+            egui::ComboBox::from_id_source("parent_combo")
                 .selected_text(selected_parent_name)
                 .show_ui(ui, |ui| {
                     for (i, p) in self.core.partitions.iter().enumerate() {
@@ -247,7 +223,7 @@ impl BiliLiveApp {
                         selected_sub_name = sub.name.clone();
                     }
 
-                    egui::ComboBox::from_id_salt("sub_combo")
+                    egui::ComboBox::from_id_source("sub_combo")
                         .selected_text(selected_sub_name)
                         .show_ui(ui, |ui| {
                             for sub in &parent.children {

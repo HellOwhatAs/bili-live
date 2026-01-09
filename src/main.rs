@@ -22,7 +22,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return eframe::run_native(
             "bili-live",
             options,
-            Box::new(|cc| Ok(Box::new(gui::BiliLiveApp::new(cc)))),
+            Box::new(|cc| {
+                egui_chinese_font::setup_chinese_fonts(&cc.egui_ctx)
+                    .expect("Failed to load Chinese fonts");
+                Box::new(gui::BiliLiveApp::new(cc))
+            }),
         )
         .map_err(|e| e.into());
     }
