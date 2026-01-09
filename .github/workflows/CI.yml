@@ -48,7 +48,11 @@ jobs:
     - name: Setup ARM toolchain
       if: contains(matrix.target, 'aarch64') && contains(matrix.target, 'linux')
       run: |
-        sudo apt-get install gcc-aarch64-linux-gnu
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu libfontconfig1-dev:arm64
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
         rustup target add ${{ matrix.target }}
 
     - name: Install musl-tools
