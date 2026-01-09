@@ -394,7 +394,7 @@ impl BiliLiveTui {
             .split(size);
 
         // Draw Tabs
-        let titles = vec!["Setup (1)", "Live (2)", "Result (3)"];
+        let titles = vec!["账号设置 [1]", "直播设置 [2]", "推流信息 [3]"];
         let tabs = Tabs::new(titles)
             .block(
                 Block::default()
