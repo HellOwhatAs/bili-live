@@ -1,6 +1,6 @@
 [package]
 license = "MIT"
-description = "A command line tool for starting and stopping live streams on bilibili.com, capable of providing the RTMP address and stream key for streaming software such as OBS."
+description = "A TUI / GUI tool for starting and stopping live streams on bilibili.com, capable of providing the RTMP address and stream key for streaming software such as OBS."
 homepage = "https://github.com/HellOwhatAs/bili-live"
 repository = "https://github.com/HellOwhatAs/bili-live"
 readme = "README.md"
