@@ -21,10 +21,12 @@ cargo install bili-live --features gui
 ```
 
 
-## TUI
+## TUI (Default)
+A robust, keyboard-driven interface powered by `ratatui`. Perfect for terminal enthusiasts and server environments.
 <img width="100%" alt="tui image" src="https://github.com/user-attachments/assets/7f68167a-f773-4753-950d-d87d165e6c04" />
 
 ## GUI
+A clean, cross-platform graphical interface powered by `egui` (enable via `--features gui`).
 <img width="100%" alt="gui image" src="https://github.com/user-attachments/assets/0748509f-21af-47db-9171-4970d6375f9a" />
 
 ## Credits
