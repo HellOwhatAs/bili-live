@@ -46,7 +46,7 @@ jobs:
         target: ${{ matrix.target }}
 
     - name: Setup ARM toolchain
-      if: contains(matrix.target, 'aarch64')
+      if: contains(matrix.target, 'aarch64') && contains(matrix.target, 'linux')
       run: |
         sudo apt-get install gcc-aarch64-linux-gnu
         rustup target add ${{ matrix.target }}
