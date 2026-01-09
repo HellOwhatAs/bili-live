@@ -45,9 +45,52 @@ impl BiliLiveApp {
             selected_parent_idx: None,
         };
 
+        Self::configure_fonts(&cc.egui_ctx);
         Self::configure_styles(&cc.egui_ctx);
 
         app
+    }
+
+    fn configure_fonts(ctx: &egui::Context) {
+        let mut fonts = egui::FontDefinitions::default();
+
+        // Try fallback font for Chinese characters
+        let font_data = match font_kit::source::SystemSource::new().select_best_match(
+            &[
+                font_kit::family_name::FamilyName::Title("Microsoft YaHei".to_owned()),
+                font_kit::family_name::FamilyName::Title("PingFang SC".to_owned()),
+                font_kit::family_name::FamilyName::Title("Noto Sans CJK SC".to_owned()),
+                font_kit::family_name::FamilyName::SansSerif,
+            ],
+            &font_kit::properties::Properties::new(),
+        ) {
+            Ok(handle) => match handle.load() {
+                Ok(font) => match font.copy_font_data() {
+                    Some(data) => Some(data),
+                    None => None, // Failed to get font data
+                },
+                Err(_) => None,
+            },
+            Err(_) => None,
+        };
+
+        if let Some(data) = font_data {
+            fonts.font_data.insert(
+                "system_fallback".to_owned(),
+                std::sync::Arc::new(egui::FontData::from_owned((*data).clone())),
+            );
+
+            // Add to Proportional fallbacks
+            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+                family.push("system_fallback".to_owned());
+            }
+            // Add to Monospace fallbacks
+            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+                family.push("system_fallback".to_owned());
+            }
+        }
+
+        ctx.set_fonts(fonts);
     }
 
     fn create_qr_image(content: &str) -> egui::ColorImage {
@@ -204,7 +247,7 @@ impl BiliLiveApp {
         }
 
         ui.horizontal(|ui| {
-            egui::ComboBox::from_id_source("parent_combo")
+            egui::ComboBox::from_id_salt("parent_combo")
                 .selected_text(selected_parent_name)
                 .show_ui(ui, |ui| {
                     for (i, p) in self.core.partitions.iter().enumerate() {
@@ -223,7 +266,7 @@ impl BiliLiveApp {
                         selected_sub_name = sub.name.clone();
                     }
 
-                    egui::ComboBox::from_id_source("sub_combo")
+                    egui::ComboBox::from_id_salt("sub_combo")
                         .selected_text(selected_sub_name)
                         .show_ui(ui, |ui| {
                             for sub in &parent.children {
@@ -277,7 +320,7 @@ impl BiliLiveApp {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.core.live_state.live_url);
             if ui.button("复制").clicked() {
-                ui.output_mut(|o| o.copied_text = self.core.live_state.live_url.clone());
+                ui.ctx().copy_text(self.core.live_state.live_url.clone());
             }
         });
 
@@ -285,7 +328,7 @@ impl BiliLiveApp {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.core.live_state.live_code);
             if ui.button("复制").clicked() {
-                ui.output_mut(|o| o.copied_text = self.core.live_state.live_code.clone());
+                ui.ctx().copy_text(self.core.live_state.live_code.clone());
             }
         });
 

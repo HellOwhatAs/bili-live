@@ -10,12 +10,12 @@ edition = "2024"
 
 [features]
 default = []
-gui = ["dep:eframe", "dep:egui", "dep:image", "dep:egui-chinese-font"]
+gui = ["dep:eframe", "dep:egui", "dep:image", "dep:font-kit"]
 
 [dependencies]
-eframe = { version = "0.27", optional = true }
-egui = { version = "0.27", optional = true }
-egui-chinese-font = { version = "0.1", optional = true }
+eframe = { version = "0.33", optional = true }
+egui = { version = "0.33", optional = true }
+font-kit = { version = "0.14.3", optional = true }
 image = { version = "0.25", features = ["jpeg", "png"], optional = true }
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
