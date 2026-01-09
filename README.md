@@ -12,11 +12,11 @@ A TUI / GUI tool for starting and stopping live streams on bilibili.com, capable
 Precompiled binarys available at [releases](https://github.com/HellOwhatAs/bili-live/releases).
 
 ### Install with Cargo
-```
-// TUI
+```bash
+# TUI
 cargo install bili-live
 
-// GUI
+# GUI
 cargo install bili-live --features gui
 ```
 
@@ -26,3 +26,7 @@ cargo install bili-live --features gui
 
 ## GUI
 <img width="100%" alt="gui image" src="https://github.com/user-attachments/assets/0748509f-21af-47db-9171-4970d6375f9a" />
+
+## Credits
+* [bilibili_live_stream_code](https://github.com/ChaceQC/bilibili_live_stream_code)
+* [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
