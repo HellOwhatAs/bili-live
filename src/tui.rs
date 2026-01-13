@@ -298,7 +298,7 @@ impl BiliLiveTui {
 
     fn handle_setup_input(&mut self, key: KeyCode) {
         match key {
-            KeyCode::Char('r') => self.core.refresh_cookies(),
+            KeyCode::Char('r') => self.core.load_local_cookies(),
             KeyCode::Char('l') => self.core.fetch_qrcode(),
             _ => {}
         }
@@ -459,7 +459,7 @@ impl BiliLiveTui {
             .split(area);
 
         f.render_widget(
-            Paragraph::new("按 'r' 刷新Cookies").block(Block::default().borders(Borders::ALL)),
+            Paragraph::new("按 'r' 读取本地 Cookies").block(Block::default().borders(Borders::ALL)),
             chunks[0],
         );
         f.render_widget(

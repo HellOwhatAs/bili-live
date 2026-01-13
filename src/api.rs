@@ -1,7 +1,11 @@
 use anyhow::{Result, anyhow};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use reqwest::{Client, header};
+use rsa::{Oaep, RsaPublicKey};
 use serde::Deserialize;
+use sha2::Sha256;
 use std::collections::{BTreeMap, HashMap};
+use std::io::Read;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::form_urlencoded;
 
@@ -489,5 +493,203 @@ impl BiliApi {
         }
 
         Err(anyhow!("获取房间标题失败"))
+    }
+
+    // --- Cookie Refresh Logic (Adapted from login.rs) ---
+
+    // JWK Public Key components
+    const REFRESH_KEY_N: &'static str = "y4HdjgJHBlbaBN04VERG4qNBIFHP6a3GozCl75AihQloSWCXC5HDNgyinEnhaQ_4-gaMud_GF50elYXLlCToR9se9Z8z433U3KjM-3Yx7ptKkmQNAMggQwAVKgq3zYAoidNEWuxpkY_mAitTSRLnsJW-NCTa0bqBFF6Wm1MxgfE";
+    const REFRESH_KEY_E: &'static str = "AQAB";
+
+    fn get_correspond_path(timestamp: u64) -> Result<String> {
+        // Decode base64url encoded n and e
+        let n_bytes = URL_SAFE_NO_PAD.decode(Self::REFRESH_KEY_N)?;
+        let e_bytes = URL_SAFE_NO_PAD.decode(Self::REFRESH_KEY_E)?;
+
+        // Create RSA Public Key
+        let public_key = RsaPublicKey::new(
+            rsa::BigUint::from_bytes_be(&n_bytes),
+            rsa::BigUint::from_bytes_be(&e_bytes),
+        )?;
+
+        // Data to encrypt
+        let data = format!("refresh_{}", timestamp);
+        let data_bytes = data.as_bytes();
+
+        // Encrypt using RSA-OAEP SHA-256
+        let padding = Oaep::new::<Sha256>();
+        let mut rng = rand::thread_rng();
+        let encrypted_data = public_key.encrypt(&mut rng, padding, data_bytes)?;
+
+        // Convert to hex string
+        let encrypted_hex = encrypted_data
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect::<String>();
+
+        Ok(encrypted_hex)
+    }
+
+    pub async fn need_refresh(&self, csrf: &str) -> Result<Option<u64>> {
+        let resp = self
+            .client
+            .get(format!(
+                "https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf={}",
+                csrf
+            ))
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+
+        if let Some(true) = resp["data"]["refresh"].as_bool() {
+            let timestamp = resp["data"]["timestamp"]
+                .as_u64()
+                .ok_or_else(|| anyhow!("timestamp missing or not u64"))?;
+            Ok(Some(timestamp))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_refresh_csrf(&self, timestamp: u64) -> Result<String> {
+        let correspond_path = Self::get_correspond_path(timestamp)?;
+
+        let bytes = self
+            .client
+            .get(format!(
+                "https://www.bilibili.com/correspond/1/{}",
+                correspond_path
+            ))
+            .header(header::CONTENT_TYPE, "charset=GBK;")
+            .send()
+            .await?
+            .bytes()
+            .await?;
+
+        let mut decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(bytes));
+        let mut decompressed_data = Vec::new();
+        decoder.read_to_end(&mut decompressed_data)?;
+        let res = String::from_utf8(decompressed_data)?;
+
+        // Use scraper to extract key
+        let html = scraper::Html::parse_document(&res);
+        // The ID is "1-name", which needs escaping in CSS selector
+        let selector = scraper::Selector::parse(r"#\31-name")
+            .map_err(|e| anyhow!("Selector parse error: {:?}", e))?;
+
+        let refresh_csrf = html
+            .select(&selector)
+            .next()
+            .ok_or_else(|| anyhow!("cannot find #1-name"))?
+            .text()
+            .next()
+            .ok_or_else(|| anyhow!("#1-name does not contain inner text"))?;
+
+        Ok(refresh_csrf.to_owned())
+    }
+
+    // Returns the new refresh token and the new full cookie string
+    pub async fn refresh_cookie(
+        &self,
+        csrf: &str,
+        refresh_token: &str,
+        old_cookie_str: &str,
+    ) -> Result<(String, String)> {
+        // 1. Check if need refresh
+        let timestamp = match self.need_refresh(csrf).await? {
+            Some(ts) => ts,
+            None => return Err(anyhow!("Cookie does not need refresh")),
+        };
+
+        // 2. Get Refresh CSRF
+        let refresh_csrf = self.get_refresh_csrf(timestamp).await?;
+
+        // 3. Post Refresh
+        let mut params = HashMap::new();
+        params.insert("csrf", csrf.to_string());
+        params.insert("refresh_csrf", refresh_csrf);
+        params.insert("source", "main_web".to_string());
+        params.insert("refresh_token", refresh_token.to_string());
+
+        let resp = self
+            .client
+            .post("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
+            .form(&params)
+            .send()
+            .await?;
+
+        // Parse old cookies
+        let mut cookies_map = HashMap::new();
+        for pair in old_cookie_str.split(';') {
+            let pair = pair.trim();
+            if let Some((k, v)) = pair.split_once('=') {
+                cookies_map.insert(k.to_string(), v.to_string());
+            }
+        }
+
+        // Apply new cookies
+        for cookie in resp.headers().get_all(header::SET_COOKIE) {
+            if let Ok(c_str) = cookie.to_str() {
+                if let Ok(parsed_cookie) = cookie::Cookie::parse(c_str) {
+                    cookies_map.insert(
+                        parsed_cookie.name().to_string(),
+                        parsed_cookie.value().to_string(),
+                    );
+                }
+            }
+        }
+
+        let body_bytes = resp.bytes().await?;
+        let res_json: serde_json::Value = serde_json::from_slice(&body_bytes)?;
+
+        if res_json["code"].as_i64().unwrap_or(-1) != 0 {
+            return Err(anyhow!("Refresh failed: {:?}", res_json));
+        }
+
+        let new_refresh_token = res_json["data"]["refresh_token"]
+            .as_str()
+            .ok_or_else(|| anyhow!("No refresh_token in response"))?
+            .to_string();
+
+        let new_cookie_str = cookies_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("; ");
+
+        // 4. Confirm Refresh
+        self.confirm_refresh(csrf, refresh_token, &new_cookie_str)
+            .await?;
+
+        Ok((new_refresh_token, new_cookie_str))
+    }
+
+    pub async fn confirm_refresh(
+        &self,
+        csrf: &str,
+        old_refresh_token: &str,
+        cookie_str: &str,
+    ) -> Result<()> {
+        // Need a client with the NEW cookies
+        let temp_client = Self::new_with_cookies(cookie_str);
+
+        let mut params = HashMap::new();
+        params.insert("csrf", csrf.to_string());
+        params.insert("refresh_token", old_refresh_token.to_string());
+
+        let resp = temp_client
+            .client
+            .post("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
+            .form(&params)
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+
+        if resp["code"].as_i64().unwrap_or(-1) != 0 {
+            return Err(anyhow!("Confirm refresh failed: {:?}", resp));
+        }
+        Ok(())
     }
 }

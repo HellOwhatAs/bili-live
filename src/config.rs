@@ -8,6 +8,7 @@ pub struct UserCookies {
     pub room_id: String,
     pub cookie_str: String,
     pub csrf: String,
+    pub refresh_token: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -27,18 +28,20 @@ pub fn load_cookies() -> Option<UserCookies> {
     let cookie = map.get("cookie").or(map.get("cookie_str"))?;
     let room_id = map.get("room_id")?;
     let csrf = map.get("csrf")?;
+    let refresh_token = map.get("refresh_token").cloned().unwrap_or_default();
 
     Some(UserCookies {
         room_id: room_id.clone(),
         cookie_str: cookie.clone(),
         csrf: csrf.clone(),
+        refresh_token,
     })
 }
 
 pub fn save_cookies(cookies: &UserCookies) {
     let content = format!(
-        "room_id: {}\ncookie: {}\ncsrf: {}\n",
-        cookies.room_id, cookies.cookie_str, cookies.csrf
+        "room_id: {}\ncookie: {}\ncsrf: {}\nrefresh_token: {}\n",
+        cookies.room_id, cookies.cookie_str, cookies.csrf, cookies.refresh_token
     );
     let path = get_config_path("cookies.txt");
     let _ = fs::write(path, content);

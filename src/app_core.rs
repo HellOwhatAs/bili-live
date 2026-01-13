@@ -20,6 +20,7 @@ pub enum AppMessage {
     Log(String),
     QrCodeGenerated(String, String), // url, key
     QrCodePollResult(bool, String, Option<UserCookies>),
+    CookieRefreshed(String, String), // new_refresh_token, new_cookie_str
     PartitionLoaded(Vec<ParentPartition>), // Parsed data
     StreamInfo(String, String),
     BulletSent(bool, String),
@@ -102,11 +103,7 @@ impl BiliLiveContext {
         // Load initial data
         ctx.fetch_live_version();
         ctx.fetch_server_time();
-        if let Some(cookies) = config::load_cookies() {
-            ctx.set_cookies(cookies);
-        }
-        // Fetch partition regardless of cookies, as it usually doesn't require auth
-        ctx.fetch_partition();
+        ctx.load_local_cookies();
 
         ctx
     }
@@ -192,6 +189,14 @@ impl BiliLiveContext {
                         .try_send(AppMessage::QrCodePollResult(success, msg, cookies))
                         .ok();
                 }
+                AppMessage::CookieRefreshed(new_refresh_token, new_cookie_str) => {
+                    if let Some(c) = &mut self.cookies {
+                        c.cookie_str = new_cookie_str.clone();
+                        c.refresh_token = new_refresh_token.clone();
+                        config::save_cookies(c);
+                        self.log("Cookie刷新成功".to_string());
+                    }
+                }
             }
         }
         effects
@@ -199,13 +204,14 @@ impl BiliLiveContext {
 
     // --- Actions ---
 
-    pub fn refresh_cookies(&mut self) {
+    pub fn load_local_cookies(&mut self) {
         if let Some(c) = config::load_cookies() {
             self.set_cookies(c);
-            self.fetch_partition();
+            self.refresh_cookies();
         } else {
             self.log("未找到cookies.txt".to_string());
         }
+        self.fetch_partition();
     }
 
     pub fn fetch_live_version(&self) {
@@ -286,8 +292,10 @@ impl BiliLiveContext {
                         match code {
                             0 => {
                                 let url = resp["data"]["url"].as_str().unwrap_or("");
+                                let refresh_token =
+                                    resp["data"]["refresh_token"].as_str().unwrap_or("");
                                 // Parse URL Logic
-                                let parsed_msg = Self::parse_login_url(url).await;
+                                let parsed_msg = Self::parse_login_url(url, refresh_token).await;
                                 let _ = tx.send(parsed_msg).await;
                                 break;
                             }
@@ -314,7 +322,7 @@ impl BiliLiveContext {
         });
     }
 
-    async fn parse_login_url(url: &str) -> AppMessage {
+    async fn parse_login_url(url: &str, refresh_token: &str) -> AppMessage {
         if let Ok(parsed) = Url::parse(url) {
             let params: std::collections::HashMap<_, _> =
                 parsed.query_pairs().into_owned().collect();
@@ -335,6 +343,7 @@ impl BiliLiveContext {
                 room_id,
                 cookie_str,
                 csrf: bili_jct,
+                refresh_token: refresh_token.to_string(),
             };
             return AppMessage::ParseLoginUrlResult(true, "登录成功".to_string(), Some(cookies));
         }
@@ -515,6 +524,47 @@ impl BiliLiveContext {
                 let _ = tx.send(AppMessage::RoomTitleFetched(title)).await;
                 signal.request_repaint();
             }
+        });
+    }
+
+    pub fn refresh_cookies(&mut self) {
+        let (csrf, refresh_token, cookie_str) = if let Some(c) = &self.cookies {
+            (
+                c.csrf.clone(),
+                c.refresh_token.clone(),
+                c.cookie_str.clone(),
+            )
+        } else {
+            self.log("未登录".to_string());
+            return;
+        };
+
+        if refresh_token.is_empty() {
+            self.log("缺少Refresh Token".to_string());
+            return;
+        }
+
+        let api = self.api.clone();
+        let tx = self.tx.clone();
+        let signal = self.repaint_signal.clone();
+
+        self.rt.spawn(async move {
+            match api.refresh_cookie(&csrf, &refresh_token, &cookie_str).await {
+                Ok((new_ref, new_cookie)) => {
+                    let _ = tx
+                        .send(AppMessage::CookieRefreshed(new_ref, new_cookie))
+                        .await;
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("does not need refresh") {
+                        let _ = tx.send(AppMessage::Log("Cookie无需刷新".to_string())).await;
+                    } else {
+                        let _ = tx.send(AppMessage::Log(format!("刷新失败: {}", e))).await;
+                    }
+                }
+            }
+            signal.request_repaint();
         });
     }
 }

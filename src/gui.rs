@@ -203,8 +203,8 @@ impl BiliLiveApp {
     fn draw_setup_tab(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
         ui.group(|ui| {
             ui.label("账号管理");
-            if ui.button("刷新本地Cookies").clicked() {
-                self.core.refresh_cookies();
+            if ui.button("读取本地 Cookies").clicked() {
+                self.core.load_local_cookies();
             }
             if ui.button("扫码登录").clicked() {
                 self.core.fetch_qrcode();
