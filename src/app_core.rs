@@ -76,7 +76,6 @@ pub struct BiliLiveContext {
 
     // UI-agnostic logs
     pub log_messages: String,
-    pub status_msg: String,
 }
 
 impl BiliLiveContext {
@@ -97,7 +96,6 @@ impl BiliLiveContext {
             partitions: Vec::new(),
             live_state: LiveState::default(),
             log_messages: String::new(),
-            status_msg: "就绪".to_string(),
         };
 
         // Load initial data
@@ -117,7 +115,6 @@ impl BiliLiveContext {
 
     pub fn log(&mut self, msg: String) {
         self.log_messages.push_str(&format!("{}\n", msg));
-        self.status_msg = msg;
     }
 
     pub fn process_messages(&mut self) -> Vec<UiEffect> {
