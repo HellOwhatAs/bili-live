@@ -567,4 +567,11 @@ impl BiliLiveContext {
             signal.request_repaint();
         });
     }
+
+    pub fn logout(&mut self) {
+        config::remove_files();
+        self.cookies = None;
+        self.live_settings = config::LiveSettings::default();
+        self.log("已退出登录".to_string());
+    }
 }

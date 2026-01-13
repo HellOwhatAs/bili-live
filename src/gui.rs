@@ -209,6 +209,9 @@ impl BiliLiveApp {
             if ui.button("扫码登录").clicked() {
                 self.core.fetch_qrcode();
             }
+            if ui.button("退出登录").clicked() {
+                self.core.logout();
+            }
         });
 
         if let Some(c) = &self.core.cookies {

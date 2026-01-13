@@ -300,6 +300,7 @@ impl BiliLiveTui {
         match key {
             KeyCode::Char('r') => self.core.load_local_cookies(),
             KeyCode::Char('l') => self.core.fetch_qrcode(),
+            KeyCode::Char('d') => self.core.logout(),
             _ => {}
         }
     }
@@ -454,6 +455,7 @@ impl BiliLiveTui {
             .constraints([
                 Constraint::Length(3),
                 Constraint::Length(3),
+                Constraint::Length(3),
                 Constraint::Min(0),
             ])
             .split(area);
@@ -466,14 +468,18 @@ impl BiliLiveTui {
             Paragraph::new("按 'l' 扫码登录").block(Block::default().borders(Borders::ALL)),
             chunks[1],
         );
+        f.render_widget(
+            Paragraph::new("按 'd' 退出登录").block(Block::default().borders(Borders::ALL)),
+            chunks[2],
+        );
 
         if let Some(c) = &self.core.cookies {
             f.render_widget(
                 Paragraph::new(format!("已登录 RoomID: {}", c.room_id)),
-                chunks[2],
+                chunks[3],
             );
         } else {
-            f.render_widget(Paragraph::new("未登录"), chunks[2]);
+            f.render_widget(Paragraph::new("未登录"), chunks[3]);
         }
     }
 

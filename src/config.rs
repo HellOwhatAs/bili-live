@@ -15,9 +15,6 @@ pub struct UserCookies {
 pub struct LiveSettings {
     pub title: String,
     pub area_id: String,
-    pub area_name: String,
-    pub sub_area_id: String,
-    pub sub_area_name: String,
 }
 
 pub fn load_cookies() -> Option<UserCookies> {
@@ -60,6 +57,18 @@ pub fn save_last_settings(settings: &LiveSettings) {
     let path = get_config_path("last_settings.json");
     if let Ok(content) = serde_json::to_string(settings) {
         let _ = fs::write(path, content);
+    }
+}
+
+pub fn remove_files() {
+    let path = get_config_path("cookies.txt");
+    if path.exists() {
+        let _ = fs::remove_file(path);
+    }
+
+    let path = get_config_path("last_settings.json");
+    if path.exists() {
+        let _ = fs::remove_file(path);
     }
 }
 
